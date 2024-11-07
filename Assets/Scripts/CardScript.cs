@@ -1,7 +1,5 @@
 using UnityEngine;
 
-
-
 public class CardScript : MonoBehaviour
 {
     private Animator cardAnimator;
@@ -18,10 +16,10 @@ public class CardScript : MonoBehaviour
 
     void OnMouseDown()
     {
-        if (gameManager != null && !isFlipped)
+        if (gameManager != null && !isFlipped && gameManager.CanPlaceCard())  // Verifica si se pueden levantar cartas
         {
             ShowCard();
-            gameManager.CardTouched(gameObject);
+            gameManager.cardTouched(gameObject);  // Llama al GameManager para procesar la carta tocada
         }
     }
 

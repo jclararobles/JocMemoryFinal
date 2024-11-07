@@ -1,34 +1,39 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine.UI;
 using TMPro;
+using UnityEngine.UI;
 
 public class GameManager : MonoBehaviour
 {
+    // Instància estàtica per accedir al GameManager des de qualsevol lloc
     public static GameManager Instance;
 
-    public float TotalTime = 60f;  // Temps total per al joc
-    public TextMeshProUGUI BestScore;
-    public TextMeshProUGUI Countdown;
-    public TextMeshProUGUI Tries;
-    public TextMeshProUGUI GameFinished;
-    public TextMeshProUGUI Score;
+    // Variables públiques per a la configuració i la UI
+    public float TotalTime = 60f;  // Temps total del joc
+    public TextMeshProUGUI BestScore;  // Text per mostrar el millor score
+    public TextMeshProUGUI Countdown;  // Text per mostrar el compte enrere
+    public TextMeshProUGUI Tries;  // Text per mostrar els intents
+    public TextMeshProUGUI GameFinished;  // Text per mostrar el missatge de finalització
+    public TextMeshProUGUI Score;  // Text per mostrar el score actual
 
-    public AudioClip CardFlipSound;
-    public AudioClip MatchFoundSound;
-    public AudioClip IncorrectMatchSound;
-    public AudioClip GameStartSound;
-    public AudioClip GameEndSound;
+    // Sons del joc
+    public AudioClip CardFlipSound;  // So quan es gira una carta
+    public AudioClip MatchFoundSound;  // So quan es troba una parella
+    public AudioClip IncorrectMatchSound;  // So quan les cartes no coincideixen
+    public AudioClip GameStartSound;  // So quan comença el joc
+    public AudioClip GameEndSound;  // So quan acaba el joc
 
-    public Button StartButton;
-    public Transform CardsParent;
+    // Botons i objectes 3D per al joc
+    public Button StartButton;  // Botó per començar el joc
+    public Transform CardsParent;  // Lloc on es generen les cartes
     public int GridRows = 4;  // Nombre de files de cartes
     public int GridCols = 4;  // Nombre de columnes de cartes
-    public float HorizontalSpacing = 2f;  // Espai entre cartes en horitzontal
-    public float VerticalSpacing = 2.5f;  // Espai entre cartes en vertical
-    public Vector3 GridStartPosition;  // Posició inicial de la graella
+    public float HorizontalSpacing = 2f;  // Espai horitzontal entre cartes
+    public float VerticalSpacing = 2.5f;  // Espai vertical entre cartes
+    public Vector3 GridStartPosition;  // Posició inicial per generar les cartes
 
+    // Prefabs de les cartes
     public GameObject Cube1;
     public GameObject Cube2;
     public GameObject Cube3;
@@ -38,239 +43,230 @@ public class GameManager : MonoBehaviour
     public GameObject Cube7;
     public GameObject Cube8;
 
-    private float countdown;  // Variable per a contar el temps restant
-    private int bestScore = 0;  // Millor puntuació aconseguida
-    private int matchedPairs = 0;  // Nombre de parelles emparellades
+    // Variables internes per a la lògica del joc
+    private float countdown;  // Comptador del temps
+    private int bestScore = 0;  // Millor score registrat
+    private int matchedPairs = 0;  // Nombre de parelles trobades
     private int tries = 0;  // Nombre d'intents
-    public int score = 0;  // Puntuació actual del jugador
-    private bool gameActive = false;  // Indica si el joc està actiu
-    private GameObject firstCard = null;  // Referència a la primera carta girada
-    private GameObject secondCard = null;  // Referència a la segona carta girada
-    private bool isProcessing = false;  // Per evitar que es seleccionin més cartes mentre es processem les parelles
+    public int score = 0;  // Score actual
+    private bool gameActive = false;  // Estat del joc (actiu o no)
 
-    private List<GameObject> cardInstances = new List<GameObject>();  // Llista de cartes creades
+    private GameObject firstCard = null;  // Referència a la primera carta seleccionada
+    private GameObject secondCard = null;  // Referència a la segona carta seleccionada
+    private bool isProcessing = false;  // Indica si s'estan processant les cartes
 
-    // Temps per a que les cartes desapareguin després de coincidir
-    public float timeToDisappear = 1.5f;  // Temps en segons abans de desaparèixer les cartes
+    private List<GameObject> cardInstances = new List<GameObject>();  // Llista de les cartes generades
 
+    public float timeToDisappear = 1.5f;  // Temps fins que les cartes desapareixen
+
+    // Funció que s'executa quan l'script s'instància
     void Awake()
     {
+        // Assegura't que només hi ha una instància del GameManager
         if (Instance == null)
         {
             Instance = this;
-            DontDestroyOnLoad(gameObject);  // Impedeix que es destroyi el GameManager entre escenes
+            DontDestroyOnLoad(gameObject);  // Manté el GameManager entre escenes
         }
         else
         {
-            Destroy(gameObject);  // Si ja existeix una instància, destrueix aquesta nova
+            Destroy(gameObject);  // Elimina l'instància duplicada
         }
     }
 
+    // Funció que s'executa quan el joc comença
     void Start()
     {
-        GameFinished.gameObject.SetActive(false);  // Amaga el text de "Game Over"
-        BestScore.text = "Best Score: " + bestScore;  // Mostra la millor puntuació
-        Tries.text = "Tries: " + tries;  // Mostra els intents
-        Countdown.text = "Time: " + TotalTime;  // Mostra el temps total del joc
+        // Inicialització de la UI
+        GameFinished.gameObject.SetActive(false);
+        BestScore.text = "Best Score: " + bestScore;
+        Tries.text = "Tries: " + tries;
+        Countdown.text = "Time: " + TotalTime;
 
-        StartButton.onClick.AddListener(StartGame);  // Afegeix l'escolta per començar el joc
+        // Afegir l'escoltador d'esdeveniments al botó de començar
+        StartButton.onClick.AddListener(StartGame);
     }
 
-    // Funció per començar el joc
+    // Funció que inicia el joc
     void StartGame()
     {
-        gameActive = true;  // Activa el joc
-        countdown = TotalTime;  // Inicialitza el comptador del temps
-        tries = 0;  // Reinicia els intents
-        score = 0;  // Reinicia la puntuació
-        Tries.text = "Tries: " + tries;
-        Score.text = "Score: " + score;
-        GameFinished.gameObject.SetActive(false);  // Amaga el panell de "Game Over"
-
-        AudioSource.PlayClipAtPoint(GameStartSound, Camera.main.transform.position);  // Reprodueix l'efecte de so d'inici
-
-        // Elimina les cartes anteriors si n'hi ha
-        foreach (GameObject card in cardInstances)
+        // Si el joc ha acabat, es reinicia tot
+        if (!gameActive)
         {
-            Destroy(card);
-        }
-        cardInstances.Clear();  // Esborra la llista de cartes
+            // Configura les variables per començar el joc
+            gameActive = true;
+            countdown = TotalTime;
+            tries = 0;
+            score = 0;
+            matchedPairs = 0; // Reseteja el nombre de parelles trobades
+            Tries.text = "Tries: " + tries;
+            Score.text = "Score: " + score;
+            GameFinished.gameObject.SetActive(false);
 
-        // Crear una llista de IDs per a les 8 parelles de cartes
-        List<int> cardIDs = new List<int>();
-        for (int i = 0; i < 8; i++)  // Creem 8 tipus de cartes (cada tipus apareix 2 vegades)
-        {
-            cardIDs.Add(i);    // Afegim l'ID de la carta
-            cardIDs.Add(i);    // Duplicar per crear la parella
-        }
+            // Reprodueix el so d'inici
+            AudioSource.PlayClipAtPoint(GameStartSound, Camera.main.transform.position);
 
-        ShuffleList(cardIDs);  // Barallem la llista per disposar les cartes aleatòriament
-
-        // Crear i posicionar les cartes en una graella
-        int cardIndex = 0;
-        for (int row = 0; row < GridRows; row++)  // Filades de la graella
-        {
-            for (int col = 0; col < GridCols; col++)  // Columnes de la graella
+            // Neteja les cartes anteriors (si n'hi ha)
+            foreach (GameObject card in cardInstances)
             {
-                Vector3 position = GridStartPosition + new Vector3(col * HorizontalSpacing, 0, row * VerticalSpacing);  // Càlcul de la posició
-
-                // Obtenim el prefab de la carta segons el seu ID
-                GameObject cardPrefab = GetCardPrefab(cardIDs[cardIndex]);
-
-                // Instanciamos la carta i la posicionem en la graella
-                GameObject card = Instantiate(cardPrefab, position, Quaternion.identity, CardsParent);
-                CardScript cardScript = card.GetComponent<CardScript>();
-                cardScript.cardID = cardIDs[cardIndex];  // Assignem l'ID a la carta
-                cardInstances.Add(card);
-                cardIndex++;
+                Destroy(card);
             }
-        }
+            cardInstances.Clear();
 
-        StartButton.gameObject.SetActive(false);  // Amaga el botó "Start" un cop comenci el joc
+            // Crea les cartes i les baralla
+            List<int> cardIDs = new List<int>();
+            for (int i = 0; i < 8; i++)
+            {
+                cardIDs.Add(i);
+                cardIDs.Add(i);
+            }
+
+            ShuffleList(cardIDs);  // Baralla les cartes
+
+            // Genera les cartes a la graella
+            int cardIndex = 0;
+            for (int row = 0; row < GridRows; row++)
+            {
+                for (int col = 0; col < GridCols; col++)
+                {
+                    Vector3 position = GridStartPosition + new Vector3(col * HorizontalSpacing, 0, row * VerticalSpacing);
+                    GameObject cardPrefab = GetCardPrefab(cardIDs[cardIndex]);
+                    GameObject card = Instantiate(cardPrefab, position, Quaternion.identity, CardsParent);
+                    CardScript cardScript = card.GetComponent<CardScript>();
+                    cardScript.cardID = cardIDs[cardIndex];  // Assigna un ID a la carta
+                    cardInstances.Add(card);
+                    cardIndex++;
+                }
+            }
+
+            // Oculta el botó de començar
+            StartButton.gameObject.SetActive(false);
+        }
     }
 
+    // Funció que s'executa cada frame
     void Update()
     {
         if (gameActive)
         {
-            countdown -= Time.deltaTime;  // Actualitza el temps restant
+            countdown -= Time.deltaTime;  // Redueix el temps
             Countdown.text = "Time: " + Mathf.CeilToInt(countdown);
 
-            if (countdown <= 0)  // Si s'ha acabat el temps, finalitza el joc
+            if (countdown <= 0)
             {
-                EndGame();
+                EndGame();  // Acaba el joc quan s'acaba el temps
             }
         }
     }
 
-    // Funció per gestionar quan es toca una carta
-    public void CardTouched(GameObject touchedCard)
+    // Funció que retorna si es poden col·locar cartes
+    public bool CanPlaceCard()
     {
-        if (!gameActive || isProcessing) return;  // Si el joc no està actiu o estem processant una parella, no fem res
+        return firstCard == null || secondCard == null;  // Permet seleccionar cartes si no hi ha dues seleccionades
+    }
 
-        CardScript touchedCardScript = touchedCard.GetComponent<CardScript>();
-
+    // Funció que es crida quan es toca una carta
+    public void cardTouched(GameObject cardTouched)
+    {
+        // Si és la primera carta seleccionada
         if (firstCard == null)
         {
-            firstCard = touchedCard;
-            touchedCardScript.ShowCard();  // Mostra la primera carta
+            firstCard = cardTouched;
         }
-        else if (secondCard == null)  // Només es pot seleccionar una segona carta
+        // Si és la segona carta seleccionada
+        else if (secondCard == null && cardTouched != firstCard)
         {
-            secondCard = touchedCard;
-            touchedCardScript.ShowCard();  // Mostra la segona carta
-            isProcessing = true;  // Marquem que estem processant la parella
-            StartCoroutine(ProcessCards(firstCard, secondCard));  // Comencem el procés per comparar les cartes
+            secondCard = cardTouched;
+            StartCoroutine(ProcessCards(firstCard, secondCard));  // Processa les cartes seleccionades
         }
     }
 
-    // Funció per comparar les dues cartes seleccionades
+    // Funció que gestiona el procés de comparar les cartes seleccionades
     IEnumerator ProcessCards(GameObject card1, GameObject card2)
     {
         CardScript card1Script = card1.GetComponent<CardScript>();
         CardScript card2Script = card2.GetComponent<CardScript>();
 
-        // Incrementem el nombre d'intents per cada parella comparada
-        tries++;
+        tries++;  // Incrementa els intents
         Tries.text = "Tries: " + tries;
 
-        // Si les cartes coincideixen
+        // Comprova si les cartes coincideixen
         if (card1Script.cardID == card2Script.cardID)
         {
-            AudioSource.PlayClipAtPoint(MatchFoundSound, Camera.main.transform.position);
-            score += 1;  // Afegim un punt per cada parella encertada
+            AudioSource.PlayClipAtPoint(MatchFoundSound, Camera.main.transform.position);  // So quan les cartes coincideixen
+            score += 1;  // Augmenta el score
             Score.text = "Score: " + score;
-            matchedPairs++;
+            matchedPairs++;  // Augmenta el nombre de parelles trobades
 
-            // Desapareix les cartes després d'un temps de coincidència
-            yield return new WaitForSeconds(timeToDisappear);
+            yield return new WaitForSeconds(timeToDisappear + 1.5f);  // Espera per un temps determinat
+
+            // Desactiva les cartes coincidides
             card1.SetActive(false);
             card2.SetActive(false);
 
-            if (matchedPairs == 8)  // Si totes les parelles han estat trobades
+            if (matchedPairs == 8)  // Si s'han trobat totes les parelles
             {
-                EndGame();  // Finalitzar el joc
+                EndGame();  // Finalitza el joc
             }
         }
         else
         {
-            AudioSource.PlayClipAtPoint(IncorrectMatchSound, Camera.main.transform.position);
-            yield return new WaitForSeconds(1f);  // Esperem un segon abans de girar les cartes de nou
-            card1.GetComponent<CardScript>().HideCard();
+            AudioSource.PlayClipAtPoint(IncorrectMatchSound, Camera.main.transform.position);  // So quan les cartes no coincideixen
+            yield return new WaitForSeconds(1.5f);  // Espera per mostrar les cartes incorrectes
+            card1.GetComponent<CardScript>().HideCard();  // Torna a amagar les cartes
             card2.GetComponent<CardScript>().HideCard();
         }
 
-        // Reiniciar les cartes per poder seleccionar-ne de noves
+        // Reinicia les cartes seleccionades
         firstCard = null;
         secondCard = null;
         isProcessing = false;
     }
 
-    // Finalitzar el joc
+    // Funció que acaba el joc
     void EndGame()
     {
         gameActive = false;
+        AudioSource.PlayClipAtPoint(GameEndSound, Camera.main.transform.position);  // So quan acaba el joc
 
-        // Mostrem el missatge de "Game Over"
-        GameFinished.gameObject.SetActive(true);
-        GameFinished.text = "Game Over!";
-
-        // Amaguem els altres textos
-        Countdown.gameObject.SetActive(false);
-        Tries.gameObject.SetActive(false);
-        Score.gameObject.SetActive(false);
-
-        AudioSource.PlayClipAtPoint(GameEndSound, Camera.main.transform.position);  // So de finalització del joc
-
-        // Comprovem si el jugador ha aconseguit una nova millor puntuació
+        // Actualitza el millor score si és necessari
         if (score > bestScore)
         {
             bestScore = score;
             BestScore.text = "Best Score: " + bestScore;
         }
 
-        // Activar el botó "Start" per tornar a jugar
-        StartButton.gameObject.SetActive(true);
+        // Mostra el missatge de finalització
+        GameFinished.gameObject.SetActive(true);
+        StartButton.gameObject.SetActive(true);  // Mostra el botó de començar per reiniciar
     }
 
-    // Funció per a barallar els elements d'una llista
+    // Funció per barallar la llista de cartes
     void ShuffleList<T>(List<T> list)
     {
-        System.Random rng = new System.Random();
-        int n = list.Count;
-        while (n > 1)
+        for (int i = 0; i < list.Count; i++)
         {
-            n--;
-            int k = rng.Next(n + 1);
-            T value = list[k];
-            list[k] = list[n];
-            list[n] = value;
+            T temp = list[i];
+            int randomIndex = Random.Range(i, list.Count);
+            list[i] = list[randomIndex];
+            list[randomIndex] = temp;
         }
     }
 
-    // Retorna el prefab adequat segons l'ID de la carta
-    GameObject GetCardPrefab(int cardID)
+    // Funció que retorna el prefab de la carta en funció de l'ID
+    GameObject GetCardPrefab(int id)
     {
-        switch (cardID)
+        switch (id)
         {
-            case 0:
-                return Cube1;
-            case 1:
-                return Cube2;
-            case 2:
-                return Cube3;
-            case 3:
-                return Cube4;
-            case 4:
-                return Cube5;
-            case 5:
-                return Cube6;
-            case 6:
-                return Cube7;
-            case 7:
-                return Cube8;
-            default:
-                return Cube1;
+            case 0: return Cube1;
+            case 1: return Cube2;
+            case 2: return Cube3;
+            case 3: return Cube4;
+            case 4: return Cube5;
+            case 5: return Cube6;
+            case 6: return Cube7;
+            case 7: return Cube8;
+            default: return Cube1;
         }
     }
 }
